@@ -28,7 +28,14 @@ class Task():
 
     def get_reward(self):
         """Uses current pose of sim to return reward."""
-        reward = 1.-.3*(abs(self.sim.pose[:3] - self.target_pos)).sum()
+        mis_pos_tolerance = 0.2
+        pos_diffs = self.target_pos - self.sim.pose[:3] 
+
+        reward = 1.0 # reward on hovering
+        reward += 10.0 if (pos_diffs < mis_pos_tolerance).all() else -5.0 * (np.square(pos_diffs)).sum() # misposition penalty 
+        reward -= 5.0 * abs(self.sim.angular_v).sum() # penalty on rotating
+        reward -= 5.0 * abs(self.sim.v).sum() # penalty on moving in x, y, z
+        
         return reward
 
     def step(self, rotor_speeds):
