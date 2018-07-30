@@ -28,13 +28,13 @@ class Task():
 
     def get_reward(self):
         """Uses current pose of sim to return reward."""
-        mis_pos_tolerance = 0.2
-        pos_diffs = self.target_pos - self.sim.pose[:3] 
-
-        reward = 1.0 # reward on hovering
-        reward += 10.0 if (pos_diffs < mis_pos_tolerance).all() else -5.0 * (np.square(pos_diffs)).sum() # misposition penalty 
-        reward -= 5.0 * abs(self.sim.angular_v).sum() # penalty on rotating
-        reward -= 5.0 * abs(self.sim.v).sum() # penalty on moving in x, y, z
+        
+        reward = 0.1 # reward on hovering
+        pos_diffs = abs(self.target_pos - self.sim.pose[:3])
+        reward -= 0.1 * (abs(pos_diffs)).sum() # misposition penalty 
+        reward -= 0.2 * abs(self.sim.angular_v).sum() # penalty on rotating
+        reward -= 0.2 * abs(self.sim.v[:2]).sum() # penalty on moving in x, y
+        reward += 0.3 * self.sim.v[2] # reward on flying upwards
         
         return reward
 
@@ -45,7 +45,18 @@ class Task():
         for _ in range(self.action_repeat):
             done = self.sim.next_timestep(rotor_speeds) # update the sim pose and velocities
             reward += self.get_reward() 
-            pose_all.append(self.sim.pose)
+            
+            z_reached = self.sim.pose[2] >= self.target_pos[2]        
+            if z_reached:
+                done = True
+                reward += 50.0 # reward for taken off
+                #print('taken off')
+                xy_reached = abs(self.target_pos[:2] - self.sim.pose[:2]) < 5.0
+                if xy_reached.all():
+                    reward += 50.0 # extra reward if taken off without deviating too much in the x-y plane.
+                    #print('BONUS taken off')
+            pose_all.append(self.sim.pose)    
+            
         next_state = np.concatenate(pose_all)
         return next_state, reward, done
 
